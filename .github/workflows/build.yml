@@ -1,3 +1,300 @@
+#!/data/data/com.termux/files/usr/bin/bash
+set -e
+
+ROOT="$HOME/RatmaInjector"
+mkdir -p "$ROOT/.github/workflows"
+mkdir -p "$ROOT/app/src/main/java/com/ratma/injector"
+mkdir -p "$ROOT/app/src/main/res/layout"
+mkdir -p "$ROOT/app/src/main/res/values"
+mkdir -p "$ROOT/app/src/main/jniLibs/arm64-v8a"
+mkdir -p "$ROOT/app/src/main/assets"
+
+cat > "$ROOT/settings.gradle" << 'EOF'
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+rootProject.name = "RatmaInjector"
+include ':app'
+EOF
+
+cat > "$ROOT/build.gradle" << 'EOF'
+plugins {
+    id 'com.android.application' version '8.1.4' apply false
+}
+EOF
+
+cat > "$ROOT/gradle.properties" << 'EOF'
+android.useAndroidX=true
+org.gradle.jvmargs=-Xmx2048m
+EOF
+
+cat > "$ROOT/app/build.gradle" << 'EOF'
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.ratma.injector'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.ratma.injector"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.debug
+        }
+    }
+
+    packaging {
+        jniLibs.useLegacyPackaging = true
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    splits {
+        abi {
+            enable true
+            reset()
+            include 'arm64-v8a'
+            universalApk false
+        }
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+}
+EOF
+
+cat > "$ROOT/app/src/main/AndroidManifest.xml" << 'EOF'
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <application
+        android:label="@string/app_name"
+        android:extractNativeLibs="true"
+        android:theme="@style/Theme.Ratma">
+        <activity android:name=".MainActivity"
+                  android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
+EOF
+
+cat > "$ROOT/app/src/main/res/values/strings.xml" << 'EOF'
+<resources>
+    <string name="app_name">Ratma Injector</string>
+</resources>
+EOF
+
+cat > "$ROOT/app/src/main/res/values/themes.xml" << 'EOF'
+<resources>
+    <style name="Theme.Ratma" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">#0d0d0d</item>
+        <item name="android:textColor">#e0e0e0</item>
+    </style>
+</resources>
+EOF
+
+cat > "$ROOT/app/src/main/res/layout/activity_main.xml" << 'EOF'
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0d0d0d">
+
+    <TextView android:text="RATMA" android:textSize="22sp"
+              android:textColor="#ff4444" android:textStyle="bold"
+              android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+
+    <TextView android:text="process:" android:textColor="#888"
+              android:layout_marginTop="12dp"
+              android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+    <EditText android:id="@+id/process_name"
+              android:layout_width="match_parent" android:layout_height="wrap_content"
+              android:textColor="#e0e0e0" android:textColorHint="#555"
+              android:hint="com.axlebolt.standoff2"
+              android:inputType="text"/>
+
+    <TextView android:text="libcheat.so path:" android:textColor="#888"
+              android:layout_marginTop="8dp"
+              android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+    <EditText android:id="@+id/so_path"
+              android:layout_width="match_parent" android:layout_height="wrap_content"
+              android:textColor="#e0e0e0" android:textColorHint="#555"
+              android:hint="/data/local/tmp/libcheat.so"
+              android:inputType="text"/>
+
+    <LinearLayout android:orientation="horizontal"
+                  android:layout_marginTop="10dp"
+                  android:layout_width="match_parent" android:layout_height="wrap_content">
+        <Button android:id="@+id/btn_extract" android:text="1. Extract"
+                android:layout_weight="1" android:layout_width="0dp" android:layout_height="wrap_content"/>
+        <Button android:id="@+id/btn_check" android:text="2. Check"
+                android:layout_weight="1" android:layout_width="0dp" android:layout_height="wrap_content"/>
+        <Button android:id="@+id/btn_inject" android:text="3. INJECT"
+                android:layout_weight="1" android:layout_width="0dp" android:layout_height="wrap_content"
+                android:backgroundTint="#cc2222"/>
+    </LinearLayout>
+
+    <ScrollView android:id="@+id/scroll"
+                android:layout_marginTop="10dp"
+                android:layout_width="match_parent" android:layout_height="0dp"
+                android:layout_weight="1">
+        <TextView android:id="@+id/log"
+                  android:fontFamily="monospace" android:textSize="11sp"
+                  android:textColor="#00ff88"
+                  android:layout_width="match_parent" android:layout_height="wrap_content"/>
+    </ScrollView>
+</LinearLayout>
+EOF
+
+cat > "$ROOT/app/src/main/java/com/ratma/injector/MainActivity.java" << 'EOF'
+package com.ratma.injector;
+
+import android.app.Activity;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.View;
+import android.widget.EditText;
+import android.widget.ScrollView;
+import android.widget.TextView;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+
+public class MainActivity extends Activity {
+    private TextView logView;
+    private EditText processInput, soPathInput;
+    private Handler mainHandler;
+
+    @Override
+    protected void onCreate(Bundle b) {
+        super.onCreate(b);
+        setContentView(R.layout.activity_main);
+        logView = findViewById(R.id.log);
+        processInput = findViewById(R.id.process_name);
+        soPathInput = findViewById(R.id.so_path);
+        mainHandler = new Handler(Looper.getMainLooper());
+
+        findViewById(R.id.btn_extract).setOnClickListener(v -> new Thread(this::doExtract).start());
+        findViewById(R.id.btn_check).setOnClickListener(v -> new Thread(this::doCheck).start());
+        findViewById(R.id.btn_inject).setOnClickListener(v -> new Thread(this::doInject).start());
+
+        log("RATMA ready. Extract -> Check -> INJECT.");
+        log("Перед Check открой Standoff 2 и не сворачивай.");
+    }
+
+    private void log(String s) {
+        mainHandler.post(() -> {
+            logView.append(s + "\n");
+            ScrollView sv = findViewById(R.id.scroll);
+            sv.post(() -> sv.fullScroll(View.FOCUS_DOWN));
+        });
+    }
+
+    private void doExtract() {
+        log("=== Extract ===");
+        try {
+            String nativeDir = getApplicationInfo().nativeLibraryDir;
+            String injectorSrc = nativeDir + "/libinjector.so";
+            if (!new File(injectorSrc).exists()) {
+                log("[!] libinjector.so отсутствует в APK");
+                return;
+            }
+            runSu("cp " + injectorSrc + " /data/local/tmp/libinjector && chmod 755 /data/local/tmp/libinjector");
+            log("[+] Injector -> /data/local/tmp/libinjector");
+            copyAssetToTmp("libcheat.so");
+            copyAssetToTmp("libc++_shared.so");
+            runSu("ls -la /data/local/tmp/libinjector /data/local/tmp/libcheat.so /data/local/tmp/libc++_shared.so");
+            log("[+] Extract done");
+        } catch (Exception e) {
+            log("[!] " + e);
+        }
+    }
+
+    private void copyAssetToTmp(String name) throws Exception {
+        InputStream is = getAssets().open(name);
+        File tmp = new File(getCacheDir(), name);
+        try (OutputStream os = new FileOutputStream(tmp)) {
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = is.read(buf)) > 0) os.write(buf, 0, n);
+        } finally { is.close(); }
+        runSu("cp " + tmp.getAbsolutePath() + " /data/local/tmp/" + name
+              + " && chmod 755 /data/local/tmp/" + name);
+        log("[+] " + name + " -> /data/local/tmp/");
+    }
+
+    private void doCheck() {
+        log("=== Check ===");
+        String proc = processInput.getText().toString().trim();
+        runSu("ps -A | grep -i " + proc);
+    }
+
+    private void doInject() {
+        log("=== Inject ===");
+        String proc = processInput.getText().toString().trim();
+        String so = soPathInput.getText().toString().trim();
+        runSu("/data/local/tmp/libinjector " + proc + " " + so);
+    }
+
+    private void runSu(String cmd) {
+        try {
+            Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", cmd});
+            BufferedReader out = new BufferedReader(new InputStreamReader(p.getInputStream()));
+            BufferedReader err = new BufferedReader(new InputStreamReader(p.getErrorStream()));
+            Thread t = new Thread(() -> {
+                try {
+                    String l;
+                    while ((l = err.readLine()) != null) log("[e] " + l);
+                } catch (Exception ignored) {}
+            });
+            t.start();
+            String l;
+            while ((l = out.readLine()) != null) log(l);
+            t.join();
+            p.waitFor();
+        } catch (Exception e) {
+            log("[!] su: " + e.getMessage());
+        }
+    }
+}
+EOF
+
+cat > "$ROOT/.github/workflows/build.yml" << 'EOF'
 name: Build Ratma APK
 
 on:
@@ -29,21 +326,6 @@ jobs:
         with:
           gradle-version: '8.5'
 
-      - name: Verify project files
-        run: |
-          echo "=== root ==="
-          ls -la
-          echo "=== settings.gradle ==="
-          cat settings.gradle || echo "MISSING settings.gradle"
-          echo "=== app/build.gradle ==="
-          cat app/build.gradle || echo "MISSING app/build.gradle"
-          echo "=== jniLibs ==="
-          ls -la app/src/main/jniLibs/arm64-v8a/ || echo "MISSING jniLibs"
-          echo "=== assets ==="
-          ls -la app/src/main/assets/ || echo "MISSING assets"
-          echo "=== manifest ==="
-          cat app/src/main/AndroidManifest.xml || echo "MISSING manifest"
-
       - name: Build Debug APK
         run: gradle assembleDebug --no-daemon --stacktrace
 
@@ -55,3 +337,7 @@ jobs:
           path: app/build/outputs/apk/**/*.apk
           if-no-files-found: warn
           retention-days: 14
+EOF
+
+echo "[+] Проект создан: $ROOT"
+ls -la "$ROOT"
