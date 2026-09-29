@@ -8,9 +8,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      ANDROID_HOME: /usr/local/lib/android/sdk
-      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,22 +20,32 @@ jobs:
 
       - name: Install SDK packages
         run: |
+          export ANDROID_HOME=/usr/local/lib/android/sdk
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install \
-            "platform-tools" \
-            "platforms;android-34" \
-            "build-tools;34.0.0" > /dev/null
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0" > /dev/null
 
       - name: Setup Gradle 8.5
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.5'
 
-      - name: Generate wrapper
-        run: gradle wrapper --gradle-version 8.5 --no-daemon
+      - name: Verify project files
+        run: |
+          echo "=== root ==="
+          ls -la
+          echo "=== settings.gradle ==="
+          cat settings.gradle || echo "MISSING settings.gradle"
+          echo "=== app/build.gradle ==="
+          cat app/build.gradle || echo "MISSING app/build.gradle"
+          echo "=== jniLibs ==="
+          ls -la app/src/main/jniLibs/arm64-v8a/ || echo "MISSING jniLibs"
+          echo "=== assets ==="
+          ls -la app/src/main/assets/ || echo "MISSING assets"
+          echo "=== manifest ==="
+          cat app/src/main/AndroidManifest.xml || echo "MISSING manifest"
 
       - name: Build Debug APK
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: gradle assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK
         if: always()
